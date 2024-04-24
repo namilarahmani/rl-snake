@@ -4,7 +4,7 @@ Todo:
 note: looks like tabular RL is not going to work in this context
 
 - [x] Get existing implementation of snake game working
-- [] Implement baseline algorithm (randomly choosing from feasible actions)
+[ ] Implement baseline algorithm (randomly choosing from feasible actions)
 - [] Implement tile coding for grid representation
 - [] Implement linear Q-learning and collect results
 - [] Implement deep Q-learning and collect results
