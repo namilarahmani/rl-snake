@@ -18,9 +18,10 @@ import distutils.util
 DEVICE = 'cpu' # 'cuda' if torch.cuda.is_available() else 'cpu'
 
 ## OUR METHODS
-sys.path.append('/Users/tapaswinikodavanti/Desktop/Classes/CS394R/final_project') # import functions that are one directory out
+# sys.path.append('/Users/tapaswinikodavanti/Desktop/Classes/CS394R/final_project') # import functions that are one directory out
+sys.path.append('/Users/namil/Documents/rl/rl-final-project') # import functions that are one directory out
 from baseline import baseline_action
-
+from q_learning import LinearQAgent
 
 
 #################################
@@ -34,7 +35,7 @@ def define_parameters():
     params['first_layer_size'] = 200    # neurons in the first layer
     params['second_layer_size'] = 20   # neurons in the second layer
     params['third_layer_size'] = 50    # neurons in the third layer
-    params['episodes'] = 250          
+    params['episodes'] = 50          
     params['memory_size'] = 2500
     params['batch_size'] = 1000
 
@@ -44,7 +45,7 @@ def define_parameters():
     params["test"] = True
     params['plot_score'] = True
     params['log_path'] = 'logs/scores_' + str(datetime.datetime.now().strftime("%Y%m%d%H%M%S")) +'.txt'
-    params['mode'] = "baseline"
+    params['mode'] = "linear-q"
     return params
 
 
@@ -195,8 +196,9 @@ def initialize_game(player, game, food, agent, batch_size):
     player.do_move(action, player.x, player.y, game, food, agent)
     state_init2 = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
-    agent.remember(state_init1, action, reward1, state_init2, game.crash)
-    agent.replay_new(agent.memory, batch_size)
+    agent.update(state_init1, action, reward1, state_init2, game.crash)
+    # agent.remember(state_init1, action, reward1, state_init2, game.crash)
+    # agent.replay_new(agent.memory, batch_size)
 
 
 def plot_seaborn(array_counter, array_score, train):
@@ -205,9 +207,8 @@ def plot_seaborn(array_counter, array_score, train):
     plt.figure(figsize=(13,8))
     fit_reg = False if train== False else True        
     ax = sns.regplot(
-        np.array([array_counter])[0],
-        np.array([array_score])[0],
-        #color="#36688D",
+        x=np.array(array_counter),
+        y=np.array(array_score),
         x_jitter=.1,
         scatter_kws={"color": "#36688D"},
         label='Data',
@@ -240,9 +241,12 @@ def run(params):
     Run the DQN algorithm, based on the parameters previously set.   
     """
     pygame.init()
-    agent = DQNAgent(params)
-    agent = agent.to(DEVICE)
-    agent.optimizer = optim.Adam(agent.parameters(), weight_decay=0, lr=params['learning_rate'])
+    if params['mode'] == 'linear-q':
+        agent = LinearQAgent(params)
+    else:
+        agent = DQNAgent(params)
+        agent = agent.to(DEVICE)
+        agent.optimizer = optim.Adam(agent.parameters(), weight_decay=0, lr=params['learning_rate'])
     counter_games = 0
     score_plot = []
     counter_plot = []
@@ -295,7 +299,9 @@ def run(params):
                         prediction = agent(state_old_tensor)
                         final_move = np.eye(3)[np.argmax(prediction.detach().cpu().numpy()[0])]
 
-
+            elif params['mode'] == "linear-q":
+                final_move = np.eye(3)[agent.choose_action(state_old)]
+    
             ## END OF OUR CHANGES
 
 
@@ -312,9 +318,7 @@ def run(params):
                 
             if params['train']:
                 # train short memory base on the new action and state
-                agent.train_short_memory(state_old, final_move, reward, state_new, game.crash)
-                # store the new data into a long term memory
-                agent.remember(state_old, final_move, reward, state_new, game.crash)
+                agent.update(state_old, final_move, reward, state_new, game.crash)
 
             record = get_record(game.score, record)
             if params['display']:
@@ -329,7 +333,7 @@ def run(params):
         score_plot.append(game.score)
         counter_plot.append(counter_games)
     mean, stdev = get_mean_stdev(score_plot)
-    if params['train']:
+    if params['train'] and params['mode'] is 'epsilon-greedy':
         model_weights = agent.state_dict()
         torch.save(model_weights, params["weights_path"])
     if params['plot_score']:
