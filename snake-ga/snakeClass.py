@@ -44,7 +44,7 @@ def define_parameters():
     params["test"] = True
     params['plot_score'] = True
     params['log_path'] = 'logs/scores_' + str(datetime.datetime.now().strftime("%Y%m%d%H%M%S")) +'.txt'
-    params['mode'] = "baseline"
+    params['mode'] = "epsilon-greedy"
     return params
 
 
@@ -283,7 +283,7 @@ def run(params):
                 # Choose random actions
                 final_move = baseline_action(state_old)
                 final_move = np.eye(3)[final_move] # convert to matrix form
-                
+
             elif params['mode'] == "epsilon-greedy":
                 # perform random actions based on agent.epsilon, or choose the action
                 if random.uniform(0, 1) < agent.epsilon:
@@ -325,7 +325,7 @@ def run(params):
             agent.replay_new(agent.memory, params['batch_size'])
         counter_games += 1
         total_score += game.score
-        print(f'Game {counter_games}      Score: {game.score}')
+        print(f'Game {counter_games}      Score: {game.score}      Reward: {agent.reward}')
         score_plot.append(game.score)
         counter_plot.append(counter_games)
     mean, stdev = get_mean_stdev(score_plot)
