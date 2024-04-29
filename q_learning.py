@@ -16,9 +16,9 @@ class LinearQAgent:
         self.reward = 0
         self.gamma = 0.9
         self.alpha = params['learning_rate']        
-        self.epsilon = 0.25
-        self.weights = np.zeros((11, 3))
-          
+        self.epsilon = 0.9
+        self.weights = np.full((11, 3), 0.0)
+
     def choose_action(self, state):
         if random.uniform(0, 1) < self.epsilon:
             return random.randint(0,2)  # Explore
@@ -109,4 +109,6 @@ class LinearQAgent:
             return self.reward
         if player.eaten:
             self.reward = 10
+            if self.epsilon > 0.2:
+                self.epsilon *= 0.9
         return self.reward

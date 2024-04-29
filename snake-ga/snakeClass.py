@@ -35,17 +35,19 @@ def define_parameters():
     params['first_layer_size'] = 200    # neurons in the first layer
     params['second_layer_size'] = 20   # neurons in the second layer
     params['third_layer_size'] = 50    # neurons in the third layer
-    params['episodes'] = 50          
+    params['episodes'] = 100          
     params['memory_size'] = 2500
     params['batch_size'] = 1000
+    params['gamma'] = 0.9
 
     # Settings
     params['weights_path'] = 'snake-ga/weights/weights.h5'
-    params['train'] = False
+    params['train'] = True
     params["test"] = True
     params['plot_score'] = True
     params['log_path'] = 'logs/scores_' + str(datetime.datetime.now().strftime("%Y%m%d%H%M%S")) +'.txt'
-    params['mode'] = "linear-q"
+    params['mode'] = "epsilon-greedy"
+    params['DDQN'] = False
     return params
 
 
@@ -196,9 +198,9 @@ def initialize_game(player, game, food, agent, batch_size):
     player.do_move(action, player.x, player.y, game, food, agent)
     state_init2 = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
-    agent.update(state_init1, action, reward1, state_init2, game.crash)
-    # agent.remember(state_init1, action, reward1, state_init2, game.crash)
-    # agent.replay_new(agent.memory, batch_size)
+    #agent.update(state_init1, action, reward1, state_init2, game.crash)
+    agent.remember(state_init1, action, reward1, state_init2, game.crash)
+    agent.replay_new(agent.memory, batch_size)
 
 
 def plot_seaborn(array_counter, array_score, train):
@@ -301,7 +303,7 @@ def run(params):
 
             elif params['mode'] == "linear-q":
                 final_move = np.eye(3)[agent.choose_action(state_old)]
-    
+           
             ## END OF OUR CHANGES
 
 
@@ -318,14 +320,17 @@ def run(params):
                 
             if params['train']:
                 # train short memory base on the new action and state
-                agent.update(state_old, final_move, reward, state_new, game.crash)
+                agent.train_short_memory(state_old, final_move, reward, state_new, game.crash)
+                # store the new data into a long term memory
+                agent.remember(state_old, final_move, reward, state_new, game.crash)
+                # agent.update(state_old, final_move, reward, state_new, game.crash)
 
             record = get_record(game.score, record)
             if params['display']:
                 display(player1, food1, game, record)
                 pygame.time.wait(params['speed'])
             steps+=1
-        if params['train']:
+        if params['train'] and params['mode'] is 'epsilon-greedy':
             agent.replay_new(agent.memory, params['batch_size'])
         counter_games += 1
         total_score += game.score
@@ -338,7 +343,7 @@ def run(params):
         torch.save(model_weights, params["weights_path"])
     if params['plot_score']:
         plot_seaborn(counter_plot, score_plot, params['train'])
-    return total_score, mean, stdev
+    return counter_plot, score_plot, total_score, mean, stdev
 
 if __name__ == '__main__':
     # Set options to activate or deactivate the game view, and its speed
@@ -356,12 +361,34 @@ if __name__ == '__main__':
     if args.bayesianopt:
         bayesOpt = BayesianOptimizer(params)
         bayesOpt.optimize_RL()
-    if params['train']:
-        print("Training...")
-        params['load_weights'] = False   # when training, the network is not pre-trained
-        run(params)
-    if params['test']:
-        print("Testing...")
-        params['train'] = False
-        params['load_weights'] = True
-        run(params)
+
+    double_DQN = [True, False]
+    learning_rates = [0.1, 0.01, 0.001, 0.0001]
+    first_layer = [200]
+    second_layer = [20]
+    third_layer = [50]
+    for ddqn, lr, fl, sl, tl in zip(double_DQN, learning_rates, first_layer, second_layer, third_layer):
+        params['DDQN'] = ddqn
+        params['learning_rate'] = lr
+        params['first_layer_size'] = fl
+        params['second_layer_size'] = sl
+        params['third_layer_size'] = tl
+        if params['train']:
+            print("Training...")
+            params['load_weights'] = False   # when training, the network is not pre-trained
+            counter_plot, score_plot, total_score, mean, stdev = run(params)
+        if params['test']:
+            print("Testing...")
+            params['train'] = False
+            params['load_weights'] = True
+            counter_plot, score_plot, total_score, mean, stdev = run(params)
+
+    # if params['train']:
+    #     print("Training...")
+    #     params['load_weights'] = False   # when training, the network is not pre-trained
+    #     run(params)
+    # if params['test']:
+    #     print("Testing...")
+    #     params['train'] = False
+    #     params['load_weights'] = True
+    #     run(params)

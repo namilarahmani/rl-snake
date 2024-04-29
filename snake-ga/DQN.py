@@ -14,7 +14,7 @@ class DQNAgent(torch.nn.Module):
     def __init__(self, params):
         super().__init__()
         self.reward = 0
-        self.gamma = 0.9
+        self.gamma = params['gamma']
         self.dataframe = pd.DataFrame()
         self.short_memory = np.array([])
         self.agent_target = 1
@@ -28,6 +28,7 @@ class DQNAgent(torch.nn.Module):
         self.memory = collections.deque(maxlen=params['memory_size'])
         self.weights = params['weights_path']
         self.load_weights = params['load_weights']
+        self.double_DQN = params['DDQN']
         self.optimizer = None
         self.network()
           
@@ -148,29 +149,30 @@ class DQNAgent(torch.nn.Module):
                 action_indices = torch.argmax(self.forward(next_state_tensor)[0]).item()
             next_state_q_values = self.forward(next_state_tensor)
 
-            # Use the target network to evaluate the action
-            target_q_values = self.forward(next_state_tensor).detach()
-            target = reward + self.gamma * target_q_values[0][action_indices]
+            if self.double_DQN:
+                # Use the target network to evaluate the action
+                target_q_values = self.forward(next_state_tensor).detach()
+                target = reward + self.gamma * target_q_values[0][action_indices]
 
-            output = self.forward(state_tensor)
-            target_f = output.clone()
-            target_f[0][np.argmax(action)] = target
-            target_f.detach()
-            self.optimizer.zero_grad()
-            loss = F.mse_loss(output, target_f)
-            loss.backward()
-            self.optimizer.step()
-
-            # if not done:
-            #     target = reward + self.gamma * torch.max(self.forward(next_state_tensor)[0])
-            # output = self.forward(state_tensor)
-            # target_f = output.clone()
-            # target_f[0][np.argmax(action)] = target
-            # target_f.detach()
-            # self.optimizer.zero_grad()
-            # loss = F.mse_loss(output, target_f)
-            # loss.backward()
-            # self.optimizer.step()            
+                output = self.forward(state_tensor)
+                target_f = output.clone()
+                target_f[0][np.argmax(action)] = target
+                target_f.detach()
+                self.optimizer.zero_grad()
+                loss = F.mse_loss(output, target_f)
+                loss.backward()
+                self.optimizer.step()
+            else:
+                if not done:
+                    target = reward + self.gamma * torch.max(self.forward(next_state_tensor)[0])
+                output = self.forward(state_tensor)
+                target_f = output.clone()
+                target_f[0][np.argmax(action)] = target
+                target_f.detach()
+                self.optimizer.zero_grad()
+                loss = F.mse_loss(output, target_f)
+                loss.backward()
+                self.optimizer.step()            
 
     def train_short_memory(self, state, action, reward, next_state, done):
         """
