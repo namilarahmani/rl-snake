@@ -15,6 +15,7 @@ from GPyOpt.methods import BayesianOptimization
 from bayesOpt import *
 import datetime
 import distutils.util
+import pandas as pd
 DEVICE = 'cpu' # 'cuda' if torch.cuda.is_available() else 'cpu'
 
 ## OUR METHODS
@@ -44,10 +45,10 @@ def define_parameters():
     params['weights_path'] = 'snake-ga/weights/weights.h5'
     params['train'] = True
     params["test"] = True
-    params['plot_score'] = True
+    params['plot_score'] = False
     params['log_path'] = 'logs/scores_' + str(datetime.datetime.now().strftime("%Y%m%d%H%M%S")) +'.txt'
     params['mode'] = "epsilon-greedy"
-    params['DDQN'] = False
+    params['DDQN'] = True
     return params
 
 
@@ -362,27 +363,40 @@ if __name__ == '__main__':
         bayesOpt = BayesianOptimizer(params)
         bayesOpt.optimize_RL()
 
-    double_DQN = [True, False]
-    learning_rates = [0.1, 0.01, 0.001, 0.0001]
-    first_layer = [200]
-    second_layer = [20]
-    third_layer = [50]
-    for ddqn, lr, fl, sl, tl in zip(double_DQN, learning_rates, first_layer, second_layer, third_layer):
-        params['DDQN'] = ddqn
+    # double_DQN = [True, False]
+    learning_rates = [0.01, 0.001, 0.0001]
+    # first_layer = [100, 200]
+    # second_layer = [20, 40]
+    # third_layer = [25, 50]
+    
+    # for ddqn, lr, fl, sl, tl in zip(double_DQN, learning_rates, first_layer, second_layer, third_layer):
+    df = pd.DataFrame()
+    for lr in learning_rates:
+        params['DDQN'] = False
+        params['train'] = True
+        params['test'] = True
         params['learning_rate'] = lr
-        params['first_layer_size'] = fl
-        params['second_layer_size'] = sl
-        params['third_layer_size'] = tl
-        if params['train']:
-            print("Training...")
-            params['load_weights'] = False   # when training, the network is not pre-trained
-            counter_plot, score_plot, total_score, mean, stdev = run(params)
-        if params['test']:
-            print("Testing...")
-            params['train'] = False
-            params['load_weights'] = True
-            counter_plot, score_plot, total_score, mean, stdev = run(params)
+        # params['first_layer_size'] = fl
+        # params['second_layer_size'] = sl
+        # params['third_layer_size'] = tl
 
+        #train
+        print("Training...")
+        params['load_weights'] = False   # when training, the network is not pre-trained
+        counter_plot, score_plot, total_score, mean, stdev = run(params)
+        col_name = f"traindqn{lr}"
+        df[col_name] = score_plot
+
+        #test
+        print("Testing...")
+        params['train'] = False
+        params['load_weights'] = True
+        counter_plot, score_plot, total_score, mean, stdev = run(params)
+        col_name = f"testdqn{lr}"
+        df[col_name] = score_plot
+    df.to_excel('alpha_variances.xlsx')
+
+    # To run once w default params specified in define_parameters()
     # if params['train']:
     #     print("Training...")
     #     params['load_weights'] = False   # when training, the network is not pre-trained
