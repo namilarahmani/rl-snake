@@ -30,6 +30,7 @@ class DQNAgent(torch.nn.Module):
         self.load_weights = params['load_weights']
         self.double_DQN = params['DDQN']
         self.optimizer = None
+        self.is_linear_q = False
         self.network()
           
     def network(self):

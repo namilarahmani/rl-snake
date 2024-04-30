@@ -19,8 +19,6 @@ import pandas as pd
 DEVICE = 'cpu' # 'cuda' if torch.cuda.is_available() else 'cpu'
 
 ## OUR METHODS
-# sys.path.append('/Users/tapaswinikodavanti/Desktop/Classes/CS394R/final_project') # import functions that are one directory out
-sys.path.append('/Users/namil/Documents/rl/rl-final-project') # import functions that are one directory out
 from baseline import baseline_action
 from q_learning import LinearQAgent
 
@@ -42,13 +40,14 @@ def define_parameters():
     params['gamma'] = 0.9
 
     # Settings
-    params['weights_path'] = 'snake-ga/weights/weights.h5'
-    params['train'] = True
+    params['weights_path'] = 'weights/weights.h5'
+    params['train'] = False
     params["test"] = True
     params['plot_score'] = False
     params['log_path'] = 'logs/scores_' + str(datetime.datetime.now().strftime("%Y%m%d%H%M%S")) +'.txt'
     params['mode'] = "epsilon-greedy"
-    params['DDQN'] = True
+    params['DDQN'] = False
+
     return params
 
 
@@ -60,7 +59,7 @@ class Game:
         self.game_width = game_width
         self.game_height = game_height
         self.gameDisplay = pygame.display.set_mode((game_width, game_height + 60))
-        self.bg = pygame.image.load("snake-ga/img/background.png")
+        self.bg = pygame.image.load("img/background.png")
         self.crash = False
         self.player = Player(self)
         self.food = Food()
@@ -77,7 +76,7 @@ class Player(object):
         self.position.append([self.x, self.y])
         self.food = 1
         self.eaten = False
-        self.image = pygame.image.load('snake-ga/img/snakeBody.png')
+        self.image = pygame.image.load('img/snakeBody.png')
         self.x_change = 20
         self.y_change = 0
 
@@ -137,7 +136,7 @@ class Food(object):
     def __init__(self):
         self.x_food = 240
         self.y_food = 200
-        self.image = pygame.image.load('snake-ga/img/food2.png')
+        self.image = pygame.image.load('img/food2.png')
 
     def food_coord(self, game, player):
         x_rand = randint(20, game.game_width - 40)
@@ -199,9 +198,12 @@ def initialize_game(player, game, food, agent, batch_size):
     player.do_move(action, player.x, player.y, game, food, agent)
     state_init2 = agent.get_state(game, player, food)
     reward1 = agent.set_reward(player, game.crash)
-    #agent.update(state_init1, action, reward1, state_init2, game.crash)
-    agent.remember(state_init1, action, reward1, state_init2, game.crash)
-    agent.replay_new(agent.memory, batch_size)
+
+    if agent.is_linear_q:
+        agent.update(state_init1, action, reward1, state_init2, game.crash)
+    else:
+        agent.remember(state_init1, action, reward1, state_init2, game.crash)
+        agent.replay_new(agent.memory, batch_size)
 
 
 def plot_seaborn(array_counter, array_score, train):
@@ -320,11 +322,13 @@ def run(params):
                 steps = 0
                 
             if params['train']:
-                # train short memory base on the new action and state
-                agent.train_short_memory(state_old, final_move, reward, state_new, game.crash)
-                # store the new data into a long term memory
-                agent.remember(state_old, final_move, reward, state_new, game.crash)
-                # agent.update(state_old, final_move, reward, state_new, game.crash)
+                if agent.is_linear_q:
+                    agent.update(state_old, final_move, reward, state_new, game.crash)
+                else:
+                    # train short memory base on the new action and state
+                    agent.train_short_memory(state_old, final_move, reward, state_new, game.crash)
+                    # store the new data into a long term memory
+                    agent.remember(state_old, final_move, reward, state_new, game.crash)
 
             record = get_record(game.score, record)
             if params['display']:
@@ -363,46 +367,13 @@ if __name__ == '__main__':
         bayesOpt = BayesianOptimizer(params)
         bayesOpt.optimize_RL()
 
-    # double_DQN = [True, False]
-    learning_rates = [0.01, 0.001, 0.0001]
-    # first_layer = [100, 200]
-    # second_layer = [20, 40]
-    # third_layer = [25, 50]
-    
-    # for ddqn, lr, fl, sl, tl in zip(double_DQN, learning_rates, first_layer, second_layer, third_layer):
-    df = pd.DataFrame()
-    for lr in learning_rates:
-        params['DDQN'] = False
-        params['train'] = True
-        params['test'] = True
-        params['learning_rate'] = lr
-        # params['first_layer_size'] = fl
-        # params['second_layer_size'] = sl
-        # params['third_layer_size'] = tl
-
-        #train
+    # To run once w default params specified in define_parameters()
+    if params['train']:
         print("Training...")
         params['load_weights'] = False   # when training, the network is not pre-trained
-        counter_plot, score_plot, total_score, mean, stdev = run(params)
-        col_name = f"traindqn{lr}"
-        df[col_name] = score_plot
-
-        #test
+        run(params)
+    if params['test']:
         print("Testing...")
         params['train'] = False
         params['load_weights'] = True
-        counter_plot, score_plot, total_score, mean, stdev = run(params)
-        col_name = f"testdqn{lr}"
-        df[col_name] = score_plot
-    df.to_excel('alpha_variances.xlsx')
-
-    # To run once w default params specified in define_parameters()
-    # if params['train']:
-    #     print("Training...")
-    #     params['load_weights'] = False   # when training, the network is not pre-trained
-    #     run(params)
-    # if params['test']:
-    #     print("Testing...")
-    #     params['train'] = False
-    #     params['load_weights'] = True
-    #     run(params)
+        run(params)

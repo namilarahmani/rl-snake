@@ -18,6 +18,7 @@ class LinearQAgent:
         self.alpha = params['learning_rate']        
         self.epsilon = 0.9
         self.weights = np.full((11, 3), 0.0)
+        self.is_linear_q = True
 
     def choose_action(self, state):
         if random.uniform(0, 1) < self.epsilon:
